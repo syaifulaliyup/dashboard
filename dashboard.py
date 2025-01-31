@@ -36,8 +36,8 @@ st.metric(label=" 💵 Total Pendapatan", value=f"BRL R$ {filtered_data['payment
 
 
 # Tampilkan DataFrame hasil filter
-st.write("📋 Data yang telah difilter berdasarkan tahun:")
-st.dataframe(filtered_data)
+# st.write("📋 Data yang telah difilter berdasarkan tahun:")
+# st.dataframe(filtered_data)
 
 # ------- Analisis Korelasi Jumlah Pelanggan vs Jumlah Pesanan -------
 # Hitung jumlah pelanggan unik per kota
