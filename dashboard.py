@@ -1,15 +1,135 @@
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import streamlit as st
 
-# Membaca dataset
-file_path = 'main_data.csv'
+# ------- Load Data -------
+file_path = 'main_data.csv'  # Pastikan file ini ada di direktori yang sama
 main_data = pd.read_csv(file_path)
 
-st.title('Dashboard E-Commerce')
+# Konversi kolom tanggal ke tipe datetime
+main_data["order_purchase_timestamp"] = pd.to_datetime(main_data["order_purchase_timestamp"])
+
+# ------- UI di Streamlit -------
+st.title("📊 Analisis Data Penjualan berdasarkan Tahun")
+
+st.sidebar.title(" 📑 Dashboard E-Commerce")
+st.sidebar.markdown("""
+# Daftar Isi
+1. **General**                    
+2. **Visualisasi Data Pertanyaan Bisnis**
+3. **Clustering Manual Grouping**
+""")
+
+# Sidebar untuk memilih tahun
+selected_year = st.sidebar.selectbox("Pilih Tahun:", sorted(main_data["order_purchase_timestamp"].dt.year.unique()))
+
+# Filter data berdasarkan tahun yang dipilih
+filtered_data = main_data[main_data["order_purchase_timestamp"].dt.year == selected_year]
+
+# Tampilkan jumlah total pesanan, jumlah kota, dan jumlah pelanggan unik
+st.subheader(f"Statistik Tahun {selected_year}")
+st.metric(label=" 🛒 Total Pesanan", value=len(filtered_data))
+st.metric(label=" 🏙️ Jumlah Kota ", value=filtered_data["customer_city"].nunique())
+st.metric(label=" 👨‍👩‍👧‍👦 Jumlah Pelanggan ", value=filtered_data["customer_id"].nunique())
+st.metric(label=" 💵 Total Pendapatan", value=f"BRL R$ {filtered_data['payment_value'].sum():,.0f}")
 
 
+# Tampilkan DataFrame hasil filter
+st.write("📋 Data yang telah difilter berdasarkan tahun:")
+st.dataframe(filtered_data)
+
+# ------- Analisis Korelasi Jumlah Pelanggan vs Jumlah Pesanan -------
+# Hitung jumlah pelanggan unik per kota
+customer_city_counts = filtered_data.groupby("customer_city")["customer_id"].nunique()
+
+# Hitung jumlah pesanan per kota
+order_city_counts = filtered_data.groupby("customer_city")["order_id"].count()
+
+# Gabungkan jumlah pelanggan dan jumlah pesanan
+city_data = pd.DataFrame({"customer_count": customer_city_counts, "order_count": order_city_counts}).dropna()
+
+
+# ------- Bar Chart Jumlah Pesanan per Kota (Top 10) -------
+st.subheader("📊 Top 10 Kota dengan Pesanan Terbanyak")
+top_10_cities = filtered_data["customer_city"].value_counts().nlargest(10)
+
+# Membuat bar chart menggunakan matplotlib untuk kontrol lebih lanjut
+fig, ax = plt.subplots(figsize=(10, 6))
+top_10_cities.plot(kind='bar', ax=ax, color="skyblue")
+
+# Mengatur label x agar horizontal
+ax.set_xlabel("Kota", fontsize=12)
+ax.set_ylabel("Jumlah Pesanan", fontsize=12)
+ax.set_title(f"Top 10 Kota dengan Pesanan Terbanyak di Tahun {selected_year}")
+ax.set_xticklabels(top_10_cities.index, rotation=45)  # Set horizontal labels
+
+# Menampilkan bar chart di Streamlit
+st.pyplot(fig)
+
+
+# ------- Bar Chart Top 10 Kategori Produk yang Dipesan -------
+st.subheader("📦 Top 10 Kategori Produk yang Dipesan")
+top_10_product_categories = filtered_data["product_category_name_english"].value_counts().nlargest(10)
+
+# Membuat bar chart menggunakan matplotlib untuk kontrol lebih lanjut
+fig, ax = plt.subplots(figsize=(10, 6))
+top_10_product_categories.plot(kind='bar', ax=ax, color="coral")
+
+# Mengatur label x dan y
+ax.set_xlabel("Kategori Produk", fontsize=12)
+ax.set_ylabel("Jumlah Pesanan", fontsize=12)
+ax.set_title(f"Top 10 Kategori Produk yang Dipesan di Tahun {selected_year}")
+ax.set_xticklabels(top_10_product_categories.index, rotation=45, ha='right')  # Label horizontal dengan rotasi
+
+# Menampilkan bar chart di Streamlit
+st.pyplot(fig)
+
+
+
+# ------- Bar Chart Jenis Metode Pembayaran -------
+st.subheader("💳 Distribusi Metode Pembayaran")
+payment_type_counts = filtered_data["payment_type"].value_counts()
+
+# Membuat bar chart menggunakan matplotlib untuk kontrol lebih lanjut
+fig, ax = plt.subplots(figsize=(10, 6))
+payment_type_counts.plot(kind='bar', ax=ax, color="lightgreen")
+
+# Mengatur label x dan y
+ax.set_xlabel("Metode Pembayaran", fontsize=12)
+ax.set_ylabel("Jumlah Pesanan", fontsize=12)
+ax.set_title(f"Distribusi Metode Pembayaran di Tahun {selected_year}")
+ax.set_xticklabels(payment_type_counts.index, rotation=45, ha='right')  # Label horizontal dengan rotasi
+
+# Menampilkan bar chart di Streamlit
+st.pyplot(fig)
+
+
+# ------- Scatter Plot -------
+st.subheader("📍 Scatter Plot: Hubungan Jumlah Pelanggan vs Jumlah Pesanan per Kota")
+fig, ax = plt.subplots(figsize=(10, 6))
+sns.scatterplot(x=city_data["customer_count"], y=city_data["order_count"], alpha=0.7, color="royalblue", ax=ax)
+ax.set_xlabel("Jumlah Pelanggan di Kota")
+ax.set_ylabel(f"Jumlah Pesanan Tahun {selected_year}")
+ax.set_title(f"Korelasi Pelanggan & Pesanan di Tahun {selected_year}")
+ax.grid(True)
+st.pyplot(fig)
+
+# ------- Heatmap Korelasi -------
+st.subheader("🔥 Heatmap Korelasi")
+correlation = city_data.corr()
+fig, ax = plt.subplots(figsize=(6, 5))
+sns.heatmap(correlation, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5, ax=ax)
+ax.set_title(f"Korelasi Data Tahun {selected_year}")
+st.pyplot(fig)
+
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.title("Visualisasi Data Pertanyaan Bisnis")
+st.write("Di sini akan ditampilkan visualisasi data terkait pertanyaan bisnis.")
+st.markdown("<br><br>", unsafe_allow_html=True)
+
+
+# --------------------------------------Pertanyaan Nomer 1--------------------
 st.header("Distribusi Metode Pembayaran Berdasarkan Jumlah Item dalam Pesanan")
 # Menggabungkan data jumlah item per order dengan metode pembayaran
 item_per_order = main_data.groupby("order_id")["order_item_id"].count().sort_values(ascending=False)
@@ -253,30 +373,31 @@ st.pyplot(fig)
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.markdown("<br><br>", unsafe_allow_html=True)
 
-
 # -------------------------------Analisis Lanjutan--------------------------
-st.header('Clustering Manual Grouping') 
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.title('Clustering Manual Grouping') 
+st.markdown("<br><br>", unsafe_allow_html=True)
 
 #-------------------- Pengelompokkan Pertama-------------------
-# Menghitung total pendapatan per pelanggan
+# Menghitung total Pengeluaran per pelanggan
 main_data['total_transaction'] = main_data['payment_value'] + main_data['freight_value']
 customer_revenue = main_data.groupby('customer_id')['total_transaction'].sum().reset_index()
 customer_revenue.rename(columns={'total_transaction': 'total_revenue'}, inplace=True)
 customer_revenue.sort_values(by="total_revenue", ascending=False, inplace=True)
 
-# Fungsi untuk mengkategorikan pendapatan
+# Fungsi untuk mengkategorikan Pengeluaran
 def categorize_revenue(revenue):
     if revenue < 100:
-        return 'Pendapatan Rendah'
+        return 'Pengeluaran Rendah'
     elif 100 <= revenue <= 500:
-        return 'Pendapatan Menengah'
+        return 'Pengeluaran Menengah'
     else:
-        return 'Pendapatan Tinggi'
+        return 'Pengeluaran Tinggi'
 
 # Menambahkan kategori pada data
 customer_revenue['category'] = customer_revenue['total_revenue'].apply(categorize_revenue)
 
-# Menyusun ringkasan jumlah pelanggan per kategori pendapatan
+# Menyusun ringkasan jumlah pelanggan per kategori Pengeluaran
 category_summary = customer_revenue.groupby('category')['customer_id'].count().reset_index()
 category_summary.rename(columns={'customer_id': 'total_customers'}, inplace=True)
 
@@ -284,11 +405,11 @@ category_summary.rename(columns={'customer_id': 'total_customers'}, inplace=True
 fig, ax = plt.subplots(figsize=(8, 6))
 sns.barplot(data=category_summary, x='category', y='total_customers', palette='viridis', ax=ax)
 ax.set_title('')
-ax.set_xlabel('Kategori Pendapatan')
+ax.set_xlabel('Kategori Pengeluaran')
 ax.set_ylabel('Jumlah Pelanggan')
 
 # Menampilkan plot di Streamlit
-st.subheader('Pengelompokan Pelanggan Berdasarkan Kategori Pendapatan')
+st.subheader('Pengelompokan Pelanggan Berdasarkan Kategori Pengeluaran')
 st.pyplot(fig)
 
 
@@ -356,20 +477,6 @@ ax.set_ylabel('Jumlah Ulasan', fontsize=12)
 # Tampilkan plot di Streamlit
 st.subheader('Pengelompokan Pelanggan Pelanggan Berdasarkan Review Score')
 st.pyplot(fig)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
